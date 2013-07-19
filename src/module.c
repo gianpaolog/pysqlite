@@ -29,6 +29,10 @@
 #include "microprotocols.h"
 #include "row.h"
 
+#ifdef PYSQLITE_EXPERIMENTAL
+#include "backup.h"
+#endif
+
 #if SQLITE_VERSION_NUMBER >= 3003003
 #define HAVE_SHARED_CACHE
 #endif
@@ -314,6 +318,9 @@ PyMODINIT_FUNC init_sqlite(void)
         (pysqlite_connection_setup_types() < 0) ||
         (pysqlite_cache_setup_types() < 0) ||
         (pysqlite_statement_setup_types() < 0) ||
+        #ifdef PYSQLITE_EXPERIMENTAL
+        (pysqlite_backup_setup_types() < 0) ||
+        #endif
         (pysqlite_prepare_protocol_setup_types() < 0)
        ) {
         return;

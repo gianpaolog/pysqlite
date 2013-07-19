@@ -35,9 +35,14 @@ import cross_bdist_wininst
 
 sqlite = "sqlite"
 
+PYSQLITE_EXPERIMENTAL = False
+
 sources = ["src/module.c", "src/connection.c", "src/cursor.c", "src/cache.c",
            "src/microprotocols.c", "src/prepare_protocol.c", "src/statement.c",
            "src/util.c", "src/row.c"]
+
+if PYSQLITE_EXPERIMENTAL:
+    sources.append("src/backup.c")
 
 include_dirs = []
 library_dirs = []
@@ -99,10 +104,11 @@ def get_amalgamation():
 
     zf = zipfile.ZipFile("tmp.zip")
     files = ["sqlite3.c", "sqlite3.h"]
+    directory = zf.namelist()[0]
     for fn in files:
         print "Extracting", fn
         outf = open(AMALGAMATION_ROOT + os.sep + fn, "wb")
-        outf.write(zf.read(fn))
+        outf.write(zf.read(directory + fn))
         outf.close()
     zf.close()
     os.unlink("tmp.zip")

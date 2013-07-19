@@ -30,6 +30,10 @@
 #include "util.h"
 #include "sqlitecompat.h"
 
+#ifdef PYSQLITE_EXPERIMENTAL
+#include "backup.h"
+#endif
+
 #include "pythread.h"
 
 #define ACTION_FINALIZE 1
@@ -350,6 +354,41 @@ PyObject* pysqlite_connection_cursor(pysqlite_Connection* self, PyObject* args, 
 
     return cursor;
 }
+
+#ifdef PYSQLITE_EXPERIMENTAL
+PyObject* pysqlite_connection_backup(pysqlite_Connection* self, PyObject* args, PyObject* kwargs)
+{
+    static char *kwlist[] = {"dest_db", "source_name", "dest_db_name", NULL, NULL};
+    char* source_name;
+    char* dest_name;
+    pysqlite_Connection* dest_con;
+    pysqlite_Backup* backup;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!ss", kwlist,
+                                     &pysqlite_ConnectionType, &dest_con, &source_name, &dest_name)) {
+        return NULL;
+    }
+
+    if (!pysqlite_check_thread(self) || !pysqlite_check_connection(self)) {
+        return NULL;
+    }
+
+    backup = PyObject_New(pysqlite_Backup, &pysqlite_BackupType);
+    if (!backup) {
+        return NULL;
+    }
+
+    Py_INCREF(self);
+    backup->source_con = self;
+
+    Py_INCREF(dest_con);
+    backup->dest_con = dest_con;
+
+    backup->backup = sqlite3_backup_init(dest_con->db, dest_name, self->db, source_name);
+
+    return (PyObject*)backup;
+}
+#endif
 
 PyObject* pysqlite_connection_close(pysqlite_Connection* self, PyObject* args)
 {
@@ -1201,9 +1240,9 @@ PyObject* pysqlite_connection_call(pysqlite_Connection* self, PyObject* args, Py
 
     if (rc != SQLITE_OK) {
         if (rc == PYSQLITE_TOO_MUCH_SQL) {
-            PyErr_SetString(pysqlite_Warning, "You can only execute one statement at a time.");
+            PyErr_SetString(pysqlite_ProgrammingError, "You can only execute one statement at a time.");
         } else if (rc == PYSQLITE_SQL_WRONG_TYPE) {
-            PyErr_SetString(pysqlite_Warning, "SQL is of wrong type. Must be string or unicode.");
+            PyErr_SetString(pysqlite_ProgrammingError, "SQL is of wrong type. Must be string or unicode.");
         } else {
             (void)pysqlite_statement_reset(statement);
             _pysqlite_seterror(self->db, NULL);
@@ -1554,6 +1593,10 @@ static PyGetSetDef connection_getset[] = {
 };
 
 static PyMethodDef connection_methods[] = {
+    #ifdef PYSQLITE_EXPERIMENTAL
+    {"backup", (PyCFunction)pysqlite_connection_backup, METH_VARARGS|METH_KEYWORDS,
+        PyDoc_STR("Backup database.")},
+    #endif
     {"cursor", (PyCFunction)pysqlite_connection_cursor, METH_VARARGS|METH_KEYWORDS,
         PyDoc_STR("Return a cursor for the connection.")},
     {"close", (PyCFunction)pysqlite_connection_close, METH_NOARGS,
